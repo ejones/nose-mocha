@@ -3,10 +3,11 @@ from setuptools.command import easy_install as _easy_install, develop as _develo
 import os, subprocess, errno, sys, collections
 from distutils import log
 
-npm_requirements_by_path = {
-    './nose_mocha': ['mocha'],
-    '.': ['should']
-}
+# fixes a setuptools problem with nosetests
+import multiprocessing, logging
+
+# specially designed without dependencies
+from nose_mocha import installutil
 
 def main(args=None):
 
@@ -31,12 +32,6 @@ def main(args=None):
         license='MIT',
         packages=['nose_mocha'],
         include_package_data=True,
-        package_data={
-            'nose_mocha': [
-                os.path.join(dirpath, f)[len('nose_mocha/'):]
-                for dirpath, dirnames, filenames in os.walk('nose_mocha/node_modules')
-                for f in filenames],
-        },
         zip_safe=False,
         setup_requires=['nose', 'coverage'],
         test_suite='nose.collector',
@@ -53,28 +48,10 @@ def main(args=None):
 
     setuptools.setup(**settings)
 
-def wrap_exec(func, cmd, *args, **kwargs):
-    log.info(' '.join(cmd))
-    return func(cmd, *args, **kwargs)
-
-def npm_install(dirpath, reqs):
-    origdir = os.getcwd()
-    os.chdir(dirpath)
-    try:
-        wrap_exec(subprocess.check_call, ['npm', 'install'] + reqs)
-    except OSError as e:
-        if e.errno == errno.ENOENT:
-            log.error('npm(1) not found. Please install Node.js')
-            return 1
-        else:
-            raise
-    finally:
-       os.chdir(origdir)
-
 class develop(_develop.develop):
     def install_for_development(self):
         _develop.develop.install_for_development(self)
-        npm_install('./nose_mocha', ['mocha'])
+        installutil.npm_install(log, './nose_mocha', ['mocha'])
 
 class easy_install(_easy_install.easy_install):
     def install_egg(self, egg_path, tmpdir):
@@ -82,7 +59,7 @@ class easy_install(_easy_install.easy_install):
         eggname = os.path.basename(egg_path)
         if eggname.startswith('nose_mocha-'):
             destination = os.path.join(self.install_dir, eggname)
-            npm_install(os.path.join(destination, 'nose_mocha'), ['mocha'])
+            installutil.npm_install(log, os.path.join(destination, 'nose_mocha'), ['mocha'])
         return ret
 
 _nosetests = None
@@ -92,8 +69,8 @@ def mk_nosetests_cmd():
         from nose.commands import nosetests as base
         class _nosetests(base):
             def run(self):
-                npm_install('./nose_mocha', ['mocha'])
-                npm_install('.', ['should'])
+                installutil.npm_install(log, './nose_mocha', ['mocha'])
+                installutil.npm_install(log, '.', ['should'])
                 base.run(self)
     return _nosetests
 

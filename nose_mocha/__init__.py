@@ -10,6 +10,7 @@ import re
 import sys
 from traceback import print_exc
 from nose import plugins, failure
+from . import installutil
 
 noop = lambda *args, **kwargs: None
 
@@ -106,6 +107,15 @@ course.
 
     def configure(self, options, config):
         super(Mocha, self).configure(options, config)
+            
+        # Last resort. Easy install, in a brilliant move, will not call
+        # install, so mocha may not exist by this point.
+        # do this in configure because in __init__ logging handlers haven't been
+        # initialized
+        if not os.path.isfile(mocha_script):
+            logger.warn('Mocha not found in installation directory! Fetching from NPM.')
+            installutil.npm_install(logger, pkg_resources.resource_filename('nose_mocha', ''), ['mocha'])
+
         self.mocha_opts = dict(
             ('--' + '-'.join(dest[len('mocha_'):].split('_')), getattr(options, dest))
             for dest in self.optdests.itervalues()
