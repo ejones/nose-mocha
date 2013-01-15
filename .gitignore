@@ -1,0 +1,10 @@
+node_modules/
+*.py[co]
+*.egg*
+.coverage
+/build/
+/dist/
+\#*#
+*~
+*.swp
+*.swo
