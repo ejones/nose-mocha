@@ -113,8 +113,8 @@ course.
         # do this in configure because in __init__ logging handlers haven't been
         # initialized
         if not os.path.isfile(mocha_script):
-            logger.warn('Mocha not found in installation directory! Fetching from NPM.')
-            installutil.npm_install(logger, pkg_resources.resource_filename('nose_mocha', ''), ['mocha'])
+            logger.warn('Mocha not found in installation directory (%s)! Fetching from NPM.', mocha_script)
+            installutil.npm_install(logger, os.path.dirname(__file__), ['mocha'])
 
         self.mocha_opts = dict(
             ('--' + '-'.join(dest[len('mocha_'):].split('_')), getattr(options, dest))
