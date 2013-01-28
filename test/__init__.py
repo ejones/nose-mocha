@@ -128,6 +128,16 @@ class TestSetFromEnv(MochaTestCase):
             'FAILED (failures=1)\n'
         ])
 
+class TestSingleFile(MochaTestCase):
+    suitepath = localpath('single_file.js')
+    def runTest(self):
+        self.check_line_patterns([
+            r'\.',
+            r'-+',
+            r'Ran 1 test in [\d.]+s',
+            r'',
+            r'OK'])
+
 class TestFailureToRun(MochaTestCase):
     suitepath = localpath('fails_to_run.js')
     def runTest(self):

@@ -3,13 +3,12 @@ from setuptools.command import easy_install as _easy_install, develop as _develo
 import os, subprocess, errno, sys, collections
 from distutils import log
 
-# fixes a setuptools problem with nosetests
-import multiprocessing, logging
-
-# specially designed without dependencies
-from nose_mocha import installutil
-
 def main(args=None):
+
+    # HACK: ensure NPM requirements are present for all commands.
+    log.set_threshold(log.INFO)
+    npm_install('./nose_mocha', ['mocha'])
+    npm_install('.', ['should'])
 
     settings = dict(
         name='nose-mocha',
@@ -32,6 +31,12 @@ def main(args=None):
         license='MIT',
         packages=['nose_mocha'],
         include_package_data=True,
+        package_data={
+            'nose_mocha': [
+                os.path.join(dirpath, f)[len('nose_mocha/'):]
+                for dirpath, dirnames, filenames in os.walk('nose_mocha/node_modules')
+                for f in filenames],
+        },
         zip_safe=False,
         setup_requires=['nose', 'coverage'],
         test_suite='nose.collector',
@@ -39,7 +44,6 @@ def main(args=None):
         [nose.plugins.0.10]
         mocha = nose_mocha:Mocha
         """,
-        cmdclass=CmdClass()
     )
 
     if args:
@@ -48,60 +52,35 @@ def main(args=None):
 
     setuptools.setup(**settings)
 
-class develop(_develop.develop):
-    def install_for_development(self):
-        _develop.develop.install_for_development(self)
-        installutil.npm_install(log, './nose_mocha', ['mocha'])
+def wrap_exec(func, cmd, *args, **kwargs):
+    log.info(' '.join(cmd))
+    return func(cmd, *args, **kwargs)
 
-class easy_install(_easy_install.easy_install):
-    def install_egg(self, egg_path, tmpdir):
-        ret = _easy_install.easy_install.install_egg(self, egg_path, tmpdir)
-        eggname = os.path.basename(egg_path)
-        if eggname.startswith('nose_mocha-'):
-            destination = os.path.join(self.install_dir, eggname)
-            installutil.npm_install(log, os.path.join(destination, 'nose_mocha'), ['mocha'])
-        return ret
+def wrap_os(funcname, *args):
+    log.info(funcname + ''.join(' ' + (str(x) if not isinstance(x, basestring) else x)
+                                for x in args))
+    return getattr(os, funcname)(*args)
 
-_nosetests = None
-def mk_nosetests_cmd():
-    global _nosetests
-    if _nosetests is None:
-        from nose.commands import nosetests as base
-        class _nosetests(base):
-            def run(self):
-                installutil.npm_install(log, './nose_mocha', ['mocha'])
-                installutil.npm_install(log, '.', ['should'])
-                base.run(self)
-    return _nosetests
+def npm_install(dirpath, reqs):
+    # ensure node_modules folder is present locally. If not, NPM may use the
+    # node_modules dir off a parent dir.
+    moddir = os.path.join(dirpath, 'node_modules')
+    if not os.path.isdir(moddir):
+        wrap_os('mkdir', moddir)
 
-class CmdClass(collections.MutableMapping):
-    """
-    Write cmdclass this way to lazily load the nosetests command, which will
-    only be avaialable after nosetests is installed by setup_requires.
-    """
-    _items = {
-        'develop': lambda: develop,
-        'easy_install': lambda: easy_install,
-        'nosetests': mk_nosetests_cmd
-    }
-
-    def __init__(self):
-        self._items = dict(self._items)
-
-    def __getitem__(self, key):
-        return self._items[key]()
-
-    def __iter__(self):
-        return iter(self._items)
-
-    def __len__(self):
-        return len(self._items)
-
-    def __setitem__(self, key, val):
-        self._items[key] = lambda: val
-
-    def __delitem__(self, key):
-        del self._items[key]
+    # NPM only works in the current dir, so temporarily CD into the destination
+    origdir = os.getcwd()
+    wrap_os('chdir', dirpath)
+    try:
+        wrap_exec(subprocess.check_call, ['npm', 'install'] + reqs)
+    except OSError as e:
+        if e.errno == errno.ENOENT:
+            log.error('npm(1) not found. Please install Node.js')
+            return 1
+        else:
+            raise
+    finally:
+        wrap_os('chdir', origdir)
 
 if __name__ == '__main__':
     sys.exit(main() or 0)

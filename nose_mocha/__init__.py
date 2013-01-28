@@ -8,16 +8,15 @@ import subprocess
 import pkg_resources
 import re
 import sys
-from traceback import print_exc
+import traceback
 from nose import plugins, failure
-from . import installutil
 
 noop = lambda *args, **kwargs: None
 
 # per nose doc, use a logger namespaced with "nose.plugins"
 logger = logging.getLogger('nose.plugins.mocha')
 
-mocha_script = pkg_resources.resource_filename('nose_mocha', 'node_modules/.bin/mocha')
+mocha_script = pkg_resources.resource_filename('nose_mocha', 'node_modules/mocha/bin/mocha')
 
 class Mocha(plugins.Plugin):
     """
@@ -107,15 +106,6 @@ course.
 
     def configure(self, options, config):
         super(Mocha, self).configure(options, config)
-            
-        # Last resort. Easy install, in a brilliant move, will not call
-        # install, so mocha may not exist by this point.
-        # do this in configure because in __init__ logging handlers haven't been
-        # initialized
-        if not os.path.isfile(mocha_script):
-            logger.warn('Mocha not found in installation directory (%s)! Fetching from NPM.', mocha_script)
-            installutil.npm_install(logger, os.path.dirname(__file__), ['mocha'])
-
         self.mocha_opts = dict(
             ('--' + '-'.join(dest[len('mocha_'):].split('_')), getattr(options, dest))
             for dest in self.optdests.itervalues()
@@ -140,7 +130,9 @@ course.
                         partial(self.run_mocha, path if not self.is_default_test else None))
             for result in results:
                 yield MochaTestProxy(*result)
-        
+
+    loadTestsFromFile = loadTestsFromDir    
+
     def run_mocha(self, path=None,
                     _tap_result_start_re=re.compile('^((?:not )?ok)\s+(\S+)\s+(.+)'),
                     _tap_codes={'ok': 'pass', 'not ok': 'fail'},
@@ -150,7 +142,7 @@ course.
         ``(<status>, <title>, <body>)`` where status is "pass" or "fail" and
         body is a list of lines.
         """
-        cmd = [mocha_script, '--reporter', 'tap']
+        cmd = ['node', mocha_script, '--reporter', 'tap']
         for optname, optval in self.mocha_opts.iteritems():
             if optval:
                 cmd.append(optname)
