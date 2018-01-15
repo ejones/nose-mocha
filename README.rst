@@ -3,7 +3,7 @@ nose-mocha
 
 This is a `Nose <http://nose.readthedocs.org/en/latest>`_ plugin that
 integrates tests written for the `node.js <http://nodejs.org/>`_ test framework
-`Mocha <http://visionmedia.github.com/mocha/>`_ with nosetests by running
+`Mocha <http://mochajs.org/>`_ with nosetests by running
 ``mocha(1)`` on test targets and presenting test results in the nosetests
 report. Most Mocha options (based on Mocha 1.8.1 at time of writing) may be
 passed as nosetests options with a prefix of "mocha-" and will be passed on to
